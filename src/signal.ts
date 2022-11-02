@@ -370,7 +370,7 @@ export class AsyncState<T> extends State<T> implements AsyncHook<T> {
  */
  let currentComputedStack: Computed<any>[] = []
 
- function underComputed() {
+function underComputed() {
   return currentComputedStack.length > 0
 }
 
@@ -380,7 +380,7 @@ function pushComputed(c: Computed<any>) {
 function popComputed() {
   currentComputedStack.pop()
 }
-
+// just for unit test
 export function setCurrentComputed(c: Computed<any>[]) {
   currentComputedStack = c
 }
@@ -393,6 +393,9 @@ export const ComputedInitialSymbol = Symbol('@@ComputedInitialSymbol')
 export class Computed<T> extends AsyncState<T | Symbol> implements ITarget<T> {
   batchRunCancel: () => void = () => {}
   watcher: Watcher<State<any>> = new Watcher<State<any>>(this)
+
+  static underComputed = underComputed
+
   // @TODO: maybe here need trigger async optional setting
   constructor(
     public getter:
@@ -1095,6 +1098,8 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
     effect: 'effect'
   }
 
+  static getCurrent = () => currentRunnerScope
+
   constructor(
     public runnerContext: RunnerContext<T>,
     public intialContextDeps: THookDeps,
@@ -1144,35 +1149,6 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
       })  
     }
   }
-
-  // enterComposeDriver(driverNamespace: string, n: string) {
-  //   if (!driverNamespace) {
-  //     throw new Error(
-  //       '[CurrentRunnerScope.enterComposeDriver] sub composed driver doesnt have name'
-  //     )
-  //   }
-  //   log(`[enterComposeDriver] enter namespace => ${driverNamespace}.${n}`)
-  //   this.modelIndexesPath.push(driverNamespace)
-  //   return () => {
-  //     log(`[enterComposeDriver] leave namespace <- ${driverNamespace}.${n}`)
-  //     this.modelIndexesPath.pop()
-  //   }
-  // }
-
-  // getRealEntityName(entityKey: string) {
-  //   let result = entityKey
-  //   if (this.modelIndexes) {
-  //     const subIndexes = get(this.modelIndexes, this.modelIndexesPath)
-  //     result = subIndexes[entityKey] || entityKey
-  //   }
-
-  //   log(
-  //     `[getRealEntityName] entityKey=${entityKey} mi=${!!this
-  //       .modelIndexes} result=${result}`
-  //   )
-
-  //   return result
-  // }
 
   setOptions(op: Partial<IRunnerOptions>) {
     Object.assign(this, op)
@@ -1544,6 +1520,7 @@ let currentRunnerScope: CurrentRunnerScope<Driver> | null = null
  export function stopReactiveChain() {
    currentReactiveChain = undefined
  }
+
  /**
   * collect reactive chain for debug
   */
@@ -1560,6 +1537,9 @@ let currentRunnerScope: CurrentRunnerScope<Driver> | null = null
    hasNewValue: boolean = false
    children: ReactiveChain<T>[] = []
    type?: 'update' | 'notify' | 'call'
+
+   static getCurrent = () => currentReactiveChain
+
    constructor(public parent?: ReactiveChain, public hook?: ChainTrigger<T>) {
      this.order = parent?.plusLeaf() || 0
  

@@ -39,7 +39,7 @@ export default [
       }),
     ],
     output: {
-      file: 'dist/core.esm.js',
+      file: 'dist/signal.esm.js',
       format: 'esm'
     },
   },
