@@ -2075,7 +2075,53 @@ export function cache<T>(key: string, options: ICacheOptions<T>) {
  *
  */
 
+ export function after(callback: () => void, targets: { _hook?: Hook }[]) {
+  callback = makeBatchCallback(callback)
 
+  targets.forEach(target => {
+    if (target._hook) {
+      if (target._hook instanceof InputCompute) {
+        target._hook.on(EHookEvents.afterCalling, callback)
+      } else {
+        target._hook.on(EHookEvents.change, callback)
+      }
+    }
+  })
+}
+
+export function before(callback: () => void, targets: { _hook?: Hook }[]) {
+  callback = makeBatchCallback(callback)
+
+  targets.forEach(target => {
+    if (target._hook) {
+      if (target._hook instanceof InputCompute) {
+        target._hook.on(EHookEvents.beforeCalling, callback)
+      }
+    }
+  })
+}
+
+export function combineLatest<T>(
+  arr: Array<Function & { _hook: State<T> }>
+): () => T {
+  return () => {
+    const latestState = arr.slice(1).reduce((latest, hook) => {
+      const { _hook } = hook
+      if (!_hook) {
+        return latest
+      }
+      if (!latest._hook) {
+        return hook
+      }
+      if (_hook.modifiedTimstamp > latest._hook.modifiedTimstamp) {
+        return hook
+      }
+      return latest
+    }, arr[0])
+
+    return latestState?.()
+  }
+}
 
 /**
  * using another Driver inside of Driver
