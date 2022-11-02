@@ -2179,3 +2179,16 @@ export function combineLatest<T>(
 
   return insideResult
 }
+
+export function progress<T = any>(getter: {
+  _hook: AsyncState<T> | AsyncInputCompute<T[]>
+}) {
+  const hook = getter._hook
+  return () => ({
+    state: hook.init
+      ? EScopeState.init
+      : hook.pending
+      ? EScopeState.pending
+      : EScopeState.idle
+  })
+}
