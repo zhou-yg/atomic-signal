@@ -26,18 +26,9 @@ import {
   getNames,
   THookNames,
   IStatePatchRecord,
-  IModelPatch,
   IDataPatch,
   isDataPatch,
-  isModelPatch,
   shortValue,
-  getRelatedIndexes,
-  getShallowRelatedIndexes,
-  getShallowDependentPrevNodes,
-  constructDataGraph,
-  IModelPatchCreate,
-  IModelPatchUpdate,
-  IModelPatchRemove,
   get,
   getNamespace
 } from './util'
@@ -329,7 +320,7 @@ export class StateEvent {
   getRecord(stateKey: string) {
     return this.data.get(stateKey)
   }
-  pushPatch(stateKey: string, p: IModelPatch[]) {
+  pushPatch(stateKey: string, p: IDataPatch[]) {
     let record = this.data.get(stateKey)
     if (!record) {
       record = []
@@ -1464,177 +1455,6 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
     return []
   }
 
-  // transform compose deps to number index that will be convinient for next steps
-  // hookNumberIndexDeps() {
-  //   const hookIndexDeps: THookDeps = this.intialContextDeps.map(
-  //     ([name, hi, getD, setD]) => {
-  //       const [newGetD, newSetD] = [getD, setD].map(dependencies => {
-  //         return dependencies
-  //           ?.map(numOrArr => {
-  //             if (Array.isArray(numOrArr) && numOrArr[0] === 'c') {
-  //               const [_, composeIndex, variableName] = numOrArr
-  //               const setterGetterFunc: { _hook: Hook } | undefined =
-  //                 this.composes[composeIndex]?.[variableName]
-  //               if (setterGetterFunc?._hook) {
-  //                 return this.hooks.indexOf(setterGetterFunc._hook)
-  //               }
-  //             }
-  //             return numOrArr
-  //           })
-  //           .filter(v => v !== undefined)
-  //       })
-  //       return [name, hi, newGetD, newSetD]
-  //     }
-  //   )
-  //   return hookIndexDeps
-  // }
-
-  /**
-   * get all related hook index according to passived hookIndex
-   * design logic:
-   * 1.getD -> getD -> getD
-   * 2.setD in who's getD -> getD
-   */
-  // getRelatedHookIndexes(hookIndex: number): Set<number> {
-  //   if (!this.intialContextDeps) {
-  //     return new Set()
-  //   }
-
-  //   const hookIndexDeps = this.hookNumberIndexDeps()
-  //   /**
-  //    * for the special performance case:
-  //    * query on any async and client state eg: Client Model, ClientCache, ComputedInServer
-  //    *  that will batch notify all watchers of it and
-  //    *  doing these all operations in single request
-  //    */
-  //   const isModel = this.hooks[hookIndex] instanceof AsyncState
-  //   if (isModel) {
-  //     const indexArr: number[] = []
-  //     hookIndexDeps.forEach(([_, i, get, set]) => {
-  //       if (get.includes(hookIndex)) {
-  //         indexArr.push(i)
-  //       }
-  //     })
-  //     return getRelatedIndexes(indexArr, hookIndexDeps)
-  //   }
-  //   return getRelatedIndexes(hookIndex, hookIndexDeps)
-  // }
-  // getShallowRelatedHookIndexes(hookIndex: number): Set<number> {
-  //   if (!this.intialContextDeps) {
-  //     return new Set()
-  //   }
-  //   const hookIndexDeps = this.hookNumberIndexDeps()
-  //   const tailIndexes = getShallowRelatedIndexes(hookIndex, hookIndexDeps)
-  //   return tailIndexes
-  // }
-  // getDependenceByModel(indexes: Set<number>) {
-  //   const result = new Set<number>()
-
-  //   const hookIndexDeps = this.hookNumberIndexDeps()
-  //   const rootNodes = constructDataGraph(hookIndexDeps)
-
-  //   const task = (currentIndexes: Set<number>) => {
-  //     if (currentIndexes.size <= 0) {
-  //       return
-  //     }
-
-  //     const modelHookIndexes = new Set<number>()
-  //     currentIndexes.forEach(i => {
-  //       if (this.hooks[i] instanceof Model) {
-  //         modelHookIndexes.add(i)
-  //       }
-  //     })
-  //     if (modelHookIndexes.size > 0) {
-  //       const nextModelIndexes = new Set<number>()
-  //       modelHookIndexes.forEach(i => {
-  //         getShallowDependentPrevNodes(rootNodes, { id: i }).forEach(n => {
-  //           const r = result.has(n.id)
-  //           result.add(n.id)
-  //           if (this.hooks[n.id] instanceof Model && !r) {
-  //             nextModelIndexes.add(n.id)
-  //           }
-  //         })
-  //       })
-  //       task(nextModelIndexes)
-  //     }
-  //   }
-
-  //   task(indexes)
-
-  //   return result
-  // }
-
-  // createBaseContext() {
-  //   const { hooks } = this
-  //   return this.runnerContext.serializeBase(hooks)
-  // }
-  // getRelatedIndexesByHook(h: Hook, excludeSelf?: boolean) {
-  //   const { hooks } = this
-  //   const hookIndex = h ? hooks.indexOf(h) : -1
-
-  //   let deps = this.getRelatedHookIndexes(hookIndex)
-  //   if (excludeSelf) {
-  //     deps.delete(hookIndex)
-  //   }
-  //   return deps
-  // }
-  /**
-   * as a resonse while receive a input context
-   */
-  // createPatchContext() {
-  //   const { hooks, statePatchEvents } = this
-  //   return this.runnerContext.serializePatch(hooks, statePatchEvents)
-  // }
-  /**
-   * as a input of other's Runner and trigger
-   * need deliver context principles, sort by priority:
-   * 1.model/cache(server) needn't
-   * 2.state
-   * 3.related set/get
-   */
-  // createActionContext(h?: Hook, args?: any[]): IHookContext {
-  //   const { hooks } = this
-  //   const hookIndex = h ? hooks.indexOf(h) : -1
-
-  //   let deps = new Set<number>()
-  //   if (h) {
-  //     deps = this.getRelatedHookIndexes(hookIndex)
-  //   }
-
-  //   return this.runnerContext.serializeAction(
-  //     hooks,
-  //     hookIndex,
-  //     args || [],
-  //     deps
-  //   )
-  // }
-  // createShallowActionContext(h?: Hook, args?: any[]): IHookContext {
-  //   const { hooks } = this
-  //   const hookIndex = h ? hooks.indexOf(h) : -1
-
-  //   let deps = new Set<number>()
-  //   if (h) {
-  //     deps = this.getShallowRelatedHookIndexes(hookIndex)
-  //     /** model must need it's shallow dependent */
-  //     if (deps.size > 0) {
-  //       const modelDeps = this.getDependenceByModel(deps)
-  //       modelDeps.forEach(v => {
-  //         deps.add(v)
-  //       })
-  //     }
-  //   }
-
-  //   return this.runnerContext.serializeAction(
-  //     hooks,
-  //     hookIndex,
-  //     args || [],
-  //     deps
-  //   )
-  // }
-  // alias
-  // createInputComputeContext(h?: Hook, args?: any[]): IHookContext {
-  //   return this.createActionContext(h, args)
-  // }
   applyContextFromServer(c: IHookContext) {
     const { hooks } = this
 
@@ -1667,10 +1487,7 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
 
     return notReadyHooks.length === 0 ? EScopeState.idle : EScopeState.pending
   }
-  // readyReleated(h: Hook) {
-  //   const hi = this.getRelatedIndexesByHook(h, true)
-  //   return this.ready(hi)
-  // }
+
   ready(specifies?: Set<number>): Promise<void> {
     const asyncHooks = this.hooks.filter(
       (h, i) =>
@@ -2257,6 +2074,8 @@ export function cache<T>(key: string, options: ICacheOptions<T>) {
  *
  *
  */
+
+
 
 /**
  * using another Driver inside of Driver

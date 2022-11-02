@@ -240,16 +240,9 @@ export function nextTick(fn: () => void) {
 
 export type TContextData = string
 
-interface IContextHookPatch {
-  op: 'replace'
-  index: number
-  name?: string
-  oldValue: any
-}
-
 export interface IStatePatchRecord {
   timing: number
-  patch: IModelPatch[]
+  patch: IDataPatch[]
 }
 
 export interface IHookContext {
@@ -293,7 +286,7 @@ export function findWithDefault<T>(
   return e
 }
 
-export type IPatch = IDataPatch | IModelPatch
+export type IPatch = IDataPatch
 
 export const isDataPatch = (p: IPatch) => Reflect.has(p, 'path')
 export const isModelPatch = (p: IPatch) => !Reflect.has(p, 'path')
@@ -304,24 +297,6 @@ export interface IDataPatch {
   path: (string | number)[]
   value?: any
 }
-// for model
-export type IModelPatchCreate = {
-  op: 'create'
-  value: IModelCreateData
-}
-export type IModelPatchUpdate = {
-  op: 'update'
-  value: IModelData
-}
-export type IModelPatchRemove = {
-  op: 'remove'
-  value: Omit<IModelData, 'data'>
-}
-
-export type IModelPatch =
-  | IModelPatchCreate
-  | IModelPatchUpdate
-  | IModelPatchRemove
 
 export interface IStackUnit {
   value: {
@@ -924,14 +899,6 @@ export function getDependentPrevNodesWithBlock(
     arr.some(v => blocks.has(v)) ? [] : arr
   )
 }
-export function getShallowDependentPrevNodes(
-  rootNodes: Set<DataGraphNode>,
-  current: { id: number }
-) {
-  return getPrevNodesWithFilter(rootNodes, current, arr =>
-    arr.length >= 2 ? [arr[arr.length - 2]] : []
-  )
-}
 
 function getInfluencedNextNodesWithDependence(
   rootNodes: Set<DataGraphNode>,
@@ -975,125 +942,6 @@ export function getInfluencedNextNodes(
       )
     }
   )
-}
-
-export function getShallowInfluencedNextNodes(
-  rootNodes: Set<DataGraphNode>,
-  current: { id: number }
-) {
-  return getInfluencedNextNodesWithDependence(
-    rootNodes,
-    current,
-    (current, trigger) => {
-      return getShallowDependentPrevNodes(rootNodes, current)
-    }
-  )
-}
-
-export function constructDataGraph(contextDeps: THookDeps) {
-  const nodesMap = new Map<number, DataGraphNode>()
-  const hasParentIds = new Set<number>()
-  contextDeps.forEach(([hookType, id, get, set]) => {
-    let current = nodesMap.get(id)
-    if (!current) {
-      current = new DataGraphNode(id, hookType)
-      nodesMap.set(id, current)
-    }
-
-    get?.forEach(idOrArr => {
-      if (Array.isArray(idOrArr)) {
-        throw new Error(
-          `[getRelatedIndexes] 1 not support compose. transform it to hook index before calling id=${id}`
-        )
-      } else {
-        let parent = nodesMap.get(idOrArr)
-        if (!parent) {
-          parent = new DataGraphNode(
-            idOrArr,
-            getTypeFromContextDeps(contextDeps, idOrArr)
-          )
-          nodesMap.set(idOrArr, parent)
-        }
-        hasParentIds.add(current.id)
-        parent.addToGet(current)
-      }
-    })
-    set?.forEach(idOrArr => {
-      if (Array.isArray(idOrArr)) {
-        throw new Error(
-          `[getRelatedIndexes] 2 not support compose. transform it to hook index before calling id=${id}`
-        )
-      } else {
-        let child = nodesMap.get(idOrArr)
-        if (!child) {
-          child = new DataGraphNode(
-            idOrArr,
-            getTypeFromContextDeps(contextDeps, idOrArr)
-          )
-          nodesMap.set(idOrArr, child)
-        }
-        hasParentIds.add(child.id)
-        if (child.type === 'ic') {
-          current.addToCall(child)
-        } else {
-          current.addToSet(child)
-        }
-      }
-    })
-  })
-  const rootNodes = new Set<DataGraphNode>()
-  for (const [id, n] of nodesMap) {
-    if (!hasParentIds.has(id)) {
-      rootNodes.add(n)
-    }
-  }
-  return rootNodes
-}
-
-export function getRelatedIndexes(
-  index: number[] | number,
-  contextDeps: THookDeps
-) {
-  const indexArr = [].concat(index)
-
-  const deps = new Set<number>(indexArr)
-
-  const rootNodes = constructDataGraph(contextDeps)
-
-  indexArr.forEach(index => {
-    const nodes1 = getInfluencedNextNodes(rootNodes, { id: index })
-    const nodes2 = getDependentPrevNodes(rootNodes, { id: index })
-    ;[nodes1, nodes2].forEach(s => {
-      s.forEach(n => {
-        deps.add(n.id)
-      })
-    })
-  })
-
-  return deps
-}
-
-export function getShallowRelatedIndexes(
-  index: number[] | number,
-  contextDeps: THookDeps
-) {
-  const indexArr = [].concat(index)
-
-  const deps = new Set<number>(indexArr)
-
-  const rootNodes = constructDataGraph(contextDeps)
-
-  indexArr.forEach(index => {
-    const nodes1 = getShallowInfluencedNextNodes(rootNodes, { id: index })
-    const nodes2 = getShallowDependentPrevNodes(rootNodes, { id: index })
-    ;[nodes1, nodes2].forEach(s => {
-      s.forEach(n => {
-        deps.add(n.id)
-      })
-    })
-  })
-
-  return deps
 }
 
 export const tttcorevv = 5
