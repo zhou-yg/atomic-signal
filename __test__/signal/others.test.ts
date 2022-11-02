@@ -1,6 +1,5 @@
 import {
-  Runner, cloneDeep, debuggerLog, IDiff, IHookContext,
-  IQueryWhere, set, setEnv, internalProxy, State, setCurrentComputed, Computed
+  Runner, State, setCurrentComputed, Computed
 } from '../../src/index'
 import * as mockBM from '../mockBM'
 

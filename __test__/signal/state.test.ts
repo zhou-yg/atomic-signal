@@ -1,7 +1,7 @@
 import {
   IHookContext,
   Runner,
-} from '../../src/'
+} from '../../src'
 
 import * as mockBM from '../mockBM'
 

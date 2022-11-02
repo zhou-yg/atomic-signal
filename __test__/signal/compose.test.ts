@@ -1,4 +1,4 @@
-import { Runner, IHookContext, State, Computed } from '../../src/index'
+import { Runner, Computed } from '../../src/index'
 import * as mockBM from '../mockBM'
 
 describe('compose', () => {

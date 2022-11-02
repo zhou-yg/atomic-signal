@@ -5,13 +5,7 @@ import {
   State,
   Computed,
   InputCompute,
-  Model,
-  Cache,
-  WriteModel,
-  CurrentRunnerScope,
-  debuggerLog,
   ComputedInitialSymbol,
-  getPlugin,
 } from '../../src/index'
 
 import * as mockBM from '../mockBM'
@@ -21,94 +15,6 @@ describe('chain', () => {
 
   afterEach(() => {
     stopReactiveChain()
-  })
-  describe('init', () => {
-    it('all lazy hooks', () => {
-      const runner = new Runner(mockBM.hooksInOneLazy)
-
-      const chain = startdReactiveChain()
-  
-      runner.init()
-  
-      chain.stop()
-
-      expect(runner.state()).toBe('idle')
-      expect(chain.children.length).toBe(6)
-      expect(chain.children[0].hook).toBeInstanceOf(State)
-      expect(chain.children[1].hook).toBeInstanceOf(Computed)
-      expect(chain.children[2].hook).toBeInstanceOf(Cache)
-      expect(chain.children[3].hook).toBeInstanceOf(Model)
-      expect(chain.children[4].hook).toBeInstanceOf(WriteModel)
-      expect(chain.children[5].hook).toBeInstanceOf(InputCompute)
-    })
-    it('all lazy hooks, model trigger', () => {
-      const runner = new Runner(mockBM.hooksInOneModelTrigger)
-
-      const chain = startdReactiveChain()
-  
-      runner.init()
-  
-      chain.stop()
-
-      expect(runner.state()).toBe('pending')
-      expect(chain.children.length).toBe(7)
-
-      expect(chain.children[0].hook).toBeInstanceOf(State)
-      expect(chain.children[1].hook).toBeInstanceOf(Computed)
-      expect(chain.children[2].hook).toBeInstanceOf(Cache)
-      expect(chain.children[3].hook).toBeInstanceOf(Model)
-      expect(chain.children[4].hook).toBeInstanceOf(WriteModel)
-      expect(chain.children[5].hook).toBeInstanceOf(InputCompute)
-      //-- trigger
-      const triggerScopeChain = chain.children[6]
-      expect(triggerScopeChain.hook).toBeInstanceOf(CurrentRunnerScope)
-      expect(triggerScopeChain.children[0].hook).toBeInstanceOf(Model)
-      expect(triggerScopeChain.children[0].children[0].hook).toBeInstanceOf(Computed)
-    })
-    it('all lazy hooks, call hook', async () => {
-      const runner = new Runner(mockBM.hooksInOneLazy)
-
-      const chain = startdReactiveChain()
-  
-      runner.init()
-  
-      expect(runner.state()).toBe('idle')
-      expect(chain.children.length).toBe(6)
-
-      await runner.callHook(5, [])
-
-      expect(runner.state()).toBe('idle')
-      expect(chain.children.length).toBe(7)
-
-      chain.stop()
-      // chain.print()
-      //-- trigger
-      const triggerScopeChain = chain.children[6]
-      expect(triggerScopeChain.hook).toBeInstanceOf(CurrentRunnerScope)
-      expect(triggerScopeChain.children[0].hook).toBeInstanceOf(InputCompute)
-      expect(triggerScopeChain.children[0].children[0].hook).toBeInstanceOf(State)
-    })
-    it('model trigger lazy cache', async () => {
-      const runner = new Runner(mockBM.modelUseCache)
-      const chain = startdReactiveChain()
-  
-      const scope = runner.prepareScope()
-      getPlugin('regularKV').set(scope, 'modelUseCacheCount', 1)
-      runner.executeDriver(scope)
-
-      await mockBM.wait()
-
-      chain.stop()
-
-      expect(chain.children.length).toBe(3)
-
-      const triggerModelChain = chain.children[2].children[0]
-      expect(triggerModelChain.hook).toBeInstanceOf(Model)
-      expect(triggerModelChain.children[0].hook).toBeInstanceOf(Computed)
-
-      const cacheChain = triggerModelChain.children[0].children[0]
-      expect(cacheChain.hook).toBeInstanceOf(Cache)
-    })
   })
 
   describe('callHook', () => {
@@ -177,6 +83,9 @@ describe('chain', () => {
   
       const chain = startdReactiveChain()
       ic()
+
+      // await mockBM.wait()
+
       chain.stop()
       // root
       expect(chain.hook).toBe(undefined)

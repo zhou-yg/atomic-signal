@@ -1,6 +1,6 @@
 import {
   Runner,
-} from '../../src/'
+} from '../../src'
 
 import * as mockBM from '../mockBM'
 
@@ -66,25 +66,7 @@ describe('runner basic', () => {
       expect(e.message).toBe('[state] must under a tarat runner')
     }
   })
-  it('run server oneModel', async () => {
-    process.env.TARGET = 'server'
-    const runner = new Runner(mockBM.oneModel)
-    const initResult = runner.init()
-    process.env.TARGET = ''
 
-    expect(initResult.m1()).not.toBeInstanceOf(Promise)
-    expect(initResult.m1()).toEqual([])
-
-    expect(runner.scope.hooks.length).toBe(1)
-    expect((runner.scope.hooks[0] as any).value).toEqual([])
-  })
-  it('run oneModel without Runner', () => {
-    try {
-      const runner = mockBM.oneModel()
-    } catch (e: any) {
-      expect(e.message).toBe('[model] must under a tarat runner')
-    }
-  })
   it('run oneCompute', () => {
     const runner = new Runner(mockBM.oneCompute)
 

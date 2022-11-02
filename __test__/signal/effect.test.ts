@@ -2,8 +2,7 @@ import {
   after,
   Runner,
   startdReactiveChain,
-  stopReactiveChain,
-} from '../../src/'
+} from '../../src'
 
 import * as mockBM from '../mockBM'
 

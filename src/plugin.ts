@@ -1,58 +1,5 @@
-import { IDiff, IHookContext } from './util'
+import { IHookContext } from './util'
 import type { CurrentRunnerScope } from './signal'
-
-export type IModelCreateData =
-  | Omit<IModelData, 'where'>
-  | Omit<IModelData, 'where'>[]
-
-export interface IModelData {
-  where: { id: number }
-  data: {
-    [k: string]:
-      | any
-      | {
-          connect?: { id: number }
-          create?: IModelData
-        }
-  }
-  include?: Record<string, boolean>
-}
-
-interface IQuerySelect {
-  [k: string]:
-    | boolean
-    | {
-        select: IQuerySelect
-      }
-}
-
-interface IQueryInclude {
-  [k: string]:
-    | boolean
-    | {
-        include: IQueryInclude
-      }
-}
-
-export interface IQueryWhere {
-  where?: {
-    [k: string]: any
-  }
-  skip?: number
-  take?: number
-  include?: IQueryInclude
-  select?: IQuerySelect
-  orderBy?: {
-    [k: string]: 'desc' | 'asc'
-  }
-  cursor?: {
-    id?: number
-  }
-}
-export interface IModelQuery {
-  entity: string
-  query: IQueryWhere
-}
 
 export type TCacheFrom = 'cookie' | 'regularKV' // | 'redis' | 'localStorage' | 'sessionStorage'
 
@@ -64,21 +11,6 @@ export interface IRunningContext {
 }
 
 const plugins: {
-  Model?: {
-    find(
-      from: string,
-      entity: string,
-      query: IModelQuery['query']
-    ): Promise<any>
-    update(from: string, entity: string, query: IModelData): Promise<number[]>
-    create(from: string, entity: string, data: IModelCreateData): Promise<any>
-    remove(
-      from: string,
-      entity: string,
-      data: Omit<IModelData, 'data'>
-    ): Promise<number[]>
-    executeDiff(from: string, entity: string, d: IDiff): Promise<void>
-  }
   Cache?: {
     getValue<T>(
       scope: CurrentRunnerScope,
@@ -92,11 +24,6 @@ const plugins: {
       from: TCacheFrom
     ): Promise<void>
     clearValue(scope: CurrentRunnerScope, k: string, from: TCacheFrom): void
-  }
-  Context?: {
-    postDiffToServer(entity: string, d: IDiff): Promise<void>
-    postComputeToServer(c: IHookContext): Promise<IHookContext>
-    postQueryToServer(c: IHookContext): Promise<IHookContext>
   }
   GlobalRunning?: {
     setCurrent(

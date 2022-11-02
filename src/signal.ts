@@ -34,9 +34,6 @@ import {
 } from './util'
 import {
   getPlugin,
-  IModelCreateData,
-  IModelData,
-  IModelQuery,
   TCacheFrom
 } from './plugin'
 import EventEmitter from 'eventemitter3'
@@ -45,6 +42,8 @@ import type { Draft } from 'immer'
 import { merge } from './lib/merge'
 
 const { produceWithPatches, enablePatches, applyPatches } = immer
+
+enablePatches()
 
 export function freeze(target: { _hook?: { freezed?: boolean } }) {
   if (target._hook) {
@@ -1443,12 +1442,15 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
       let prevPromise: Promise<void> | null = null
 
       return hookModified.map(h => {
-        if (applyComputeParalle) {
-          return (h as State).applyComputePatches(currentInputCompute, reactiveChain)
-        }        
+        const newChildChain = reactiveChain?.addUpdate(h as State)
+
+        if (applyComputeParalle || !(h as State).applyComputeAsync) {
+          return (h as State).applyComputePatches(currentInputCompute, newChildChain)
+        }
+
         prevPromise = prevPromise
-          ? prevPromise.then(() => (h as State).applyComputePatches(currentInputCompute, reactiveChain))
-          : Promise.resolve((h as State).applyComputePatches(currentInputCompute, reactiveChain))
+          ? prevPromise.then(() => (h as State).applyComputePatches(currentInputCompute, newChildChain))
+          : Promise.resolve((h as State).applyComputePatches(currentInputCompute, newChildChain))
         return prevPromise
       })
     }

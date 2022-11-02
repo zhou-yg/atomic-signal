@@ -1,4 +1,4 @@
-import { Runner, cloneDeep, IHookContext, startdReactiveChain } from '../../src/index'
+import { Runner, startdReactiveChain } from '../../src/index'
 
 import * as mockBM from '../mockBM'
 
