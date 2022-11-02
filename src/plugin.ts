@@ -1,4 +1,3 @@
-import { IHookContext } from './util'
 import type { CurrentRunnerScope } from './signal'
 
 export type TCacheFrom = 'cookie' | 'regularKV' // | 'redis' | 'localStorage' | 'sessionStorage'
@@ -10,7 +9,9 @@ export interface IRunningContext {
   }
 }
 
-const plugins: {
+const plugins: IPlugins = {}
+
+export interface IPlugins {
   Cache?: {
     getValue<T>(
       scope: CurrentRunnerScope,
@@ -42,9 +43,7 @@ const plugins: {
     set<T>(scope: CurrentRunnerScope, k: string, value: T): Promise<void>
     clear(scope: CurrentRunnerScope, k: string): void
   }
-} = {}
-
-type IPlugins = typeof plugins
+}
 
 type TPluginKey = keyof IPlugins
 
