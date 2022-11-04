@@ -1691,6 +1691,10 @@ export const mountHookFactory = {
   cache: mountCache,
   computed: mountComputed,
   inputCompute: mountInputCompute,
+
+  // alias
+  signal,
+  action: mountInputCompute,
 }
 export const updateHookFactory = {
   state: updateState,
@@ -1698,6 +1702,9 @@ export const updateHookFactory = {
   cache: updateCache,
   computed: updateComputed,
   inputCompute: updateInputCompute,
+  // alias
+  signal,
+  action: updateInputCompute,
 }
 
 export let currentHookFactory: {
@@ -1706,6 +1713,9 @@ export let currentHookFactory: {
   cache: typeof mountCache
   computed: typeof mountComputed
   inputCompute: typeof mountInputCompute
+  // alias
+  signal: typeof signal
+  action: typeof mountInputCompute,
 } = mountHookFactory
 
 export const hookFactoryFeatures = {
@@ -1724,6 +1734,7 @@ export const hookFactoryFeatures = {
    */
   initiativeCompute: [
     'inputCompute',
+    'action'
   ],
 }
 
