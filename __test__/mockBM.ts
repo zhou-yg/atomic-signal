@@ -13,6 +13,8 @@ import {
   BM,
   compose,
   progress,
+  signal,
+  action,
 } from '../src/'
 import { loadPlugin } from '../src/plugin'
 
@@ -88,8 +90,28 @@ export function initModelConfig(obj: any = {}) {
 export function wait(ms: number = 15) {
   return new Promise(r => setTimeout(r, ms))
 }
-
+/**
+ * 
+ * some mock drivers
+ * 
+ */
 export function blank() {}
+
+export function oneSignal () {
+  const s1 = signal(1)
+  const s2 = signal(() => {
+    return s1() + 1
+  })
+
+  const a1 = action((c: number) => {
+    s1(v => v + 1)
+  })
+
+  return {
+    s1, s2
+  }
+}
+
 export function returnArg(arg: any) {
   return arg
 }

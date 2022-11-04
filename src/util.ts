@@ -204,7 +204,7 @@ export function isUndef(v?: any): v is undefined {
   return typeof v === 'undefined'
 }
 
-export function isFunc(f?: Function | any): f is Function {
+export function isFunc(f?: Function | any): f is (...args: any[]) => any {
   return typeof f === 'function'
 }
 

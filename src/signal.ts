@@ -2045,6 +2045,35 @@ export function cache<T>(key: string, options: ICacheOptions<T>) {
   return currentHookFactory.cache<T>(key, options)
 }
 
+// alias
+
+export function signal<T>(
+  fn: FComputedFuncGenerator<T>
+): (() => T) & { _hook: Computed<T> }
+export function signal<T>(
+  fn: FComputedFuncAsync<T>
+): (() => T) & { _hook: Computed<T> }
+export function signal<T>(
+  fn: FComputedFunc<T>
+): (() => T) & { _hook: Computed<T> }
+export function signal<T>(initialValue: T): {
+  (): T
+  (paramter: IModifyFunction<T>): [any, IPatch[]]
+} & { _hook: State<T> }
+export function signal<T = undefined>(): {
+  (): T
+  (paramter: IModifyFunction<T | undefined>): [any, IPatch[]]
+} & { _hook: State<T | undefined> }
+export function signal(v?: any) {
+  if (isFunc(v)) {
+    return computed(v)
+  } else {
+    return state(v)
+  }
+}
+
+export const action = inputCompute
+
 /**
  *
  *
