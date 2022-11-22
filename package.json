@@ -1,6 +1,6 @@
 {
   "name": "atomic-signal",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "a simple reactive utility for logic description",
   "main": "./dist/signal.js",
   "module": "./dist/signal.esm.js",
