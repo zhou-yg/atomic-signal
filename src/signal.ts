@@ -1188,11 +1188,10 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
   /**
    * while enter UI will activate this function
    */
-  onActivate(fn?: (...args: any[]) => void) {
+  activate() {
     this.notifyAllState()
   }
-  deactivate(fn?: (...args: any[]) => void) {
-    this.off(CurrentRunnerScope.events.update, fn)
+  deactivate() {
   }
 
   private notifyAllState() {
