@@ -2074,6 +2074,10 @@ export function signal<T = undefined>(): {
   (): T
   (paramter: IModifyFunction<T | undefined>): [any, IPatch[]]
 } & { _hook: State<T | undefined> }
+export function signal<T>(v: null): {
+  (): T
+  (paramter: IModifyFunction<T | undefined>): [any, IPatch[]]
+} & { _hook: State<T | undefined> }
 export function signal(v?: any) {
   if (isFunc(v)) {
     return computed(v)

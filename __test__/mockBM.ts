@@ -1,3 +1,4 @@
+import { sign } from 'crypto'
 import {
   state,
   inputCompute,
@@ -102,13 +103,14 @@ export function oneSignal () {
   const s2 = signal(() => {
     return s1() + 1
   })
+  const s3 = signal(null)
 
   const a1 = action((c: number) => {
     s1(v => v + 1)
   })
 
   return {
-    s1, s2
+    s1, s2, s3,
   }
 }
 
