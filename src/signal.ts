@@ -1762,25 +1762,29 @@ type IModifyFunction<T> = (draft: Draft<T>) => void
 
 function createStateSetterGetterFunc<SV>(s: State<SV>): {
   (): SV
-  (paramter: IModifyFunction<SV>): [SV, IPatch[]]
+  (parameter: IModifyFunction<SV>): [SV, IPatch[]]
 } {
-  return (paramter?: any): any => {
-    if (paramter) {
-      if (isFunc(paramter)) {
-        const [result, patches] = produceWithPatches(s.value, paramter)
-        if (currentInputeCompute) {
-          s.addComputePatches(result, patches)
-        } else {
-          const reactiveChain: ReactiveChain<SV> | undefined =
-            currentReactiveChain?.addUpdate(s)
-
-          const isUnderComputed = underComputed()
-          s.update(result, patches, isUnderComputed, reactiveChain)
-        }
-        return [result, patches]
+  return (parameter?: any): any => {
+    if (parameter) {
+      let result: SV; 
+      let patches = []
+      if (isFunc(parameter)) {
+        const r = produceWithPatches(s.value, parameter)
+        result = r[0]
+        patches = r[1]
       } else {
-        throw new Error('[change state] pass a function')
+        result = parameter
       }
+      if (currentInputeCompute) {
+        s.addComputePatches(result, patches)
+      } else {
+        const reactiveChain: ReactiveChain<SV> | undefined =
+          currentReactiveChain?.addUpdate(s)
+
+        const isUnderComputed = underComputed()
+        s.update(result, patches, isUnderComputed, reactiveChain)
+      }
+      return [result, patches]
     }
     if (currentReactiveChain) {
       return ReactiveChain.withChain(currentReactiveChain.addCall(s), () => {
@@ -1793,24 +1797,29 @@ function createStateSetterGetterFunc<SV>(s: State<SV>): {
 
 function createCacheSetterGetterFunc<SV>(c: Cache<SV>): {
   (): SV
-  (paramter: IModifyFunction<SV>): [SV, IPatch[]]
+  (parameter: IModifyFunction<SV>): [SV, IPatch[]]
 } {
-  return (paramter?: any): any => {
-    if (paramter) {
-      if (isFunc(paramter)) {
-        const [result, patches] = produceWithPatches(c.value, paramter)
-        if (currentInputeCompute) {
-          c.addComputePatches(result, patches)
-        } else {
-          const reactiveChain = currentReactiveChain?.addUpdate(c)
-
-          const isUnderComputed = underComputed()
-          c.update(result, patches, isUnderComputed, reactiveChain)
-        }
-        return [result, patches]
+  return (parameter?: any): any => {
+    if (parameter) {
+      let result: SV | Symbol; 
+      let patches = []
+      if (isFunc(parameter)) {
+        const r = produceWithPatches(c.value, parameter)
+        result = r[0]
+        patches = r[1]
       } else {
-        throw new Error('[change cache] pass a function')
+        result = parameter
       }
+
+      if (currentInputeCompute) {
+        c.addComputePatches(result, patches)
+      } else {
+        const reactiveChain = currentReactiveChain?.addUpdate(c)
+
+        const isUnderComputed = underComputed()
+        c.update(result, patches, isUnderComputed, reactiveChain)
+      }
+      return [result, patches]
     }
     if (currentReactiveChain) {
       return ReactiveChain.withChain(currentReactiveChain.addCall(c), () => {
@@ -2001,11 +2010,11 @@ function mountInputCompute(func: any) {
  */
 export function state<T>(initialValue: T): {
   (): T
-  (paramter: IModifyFunction<T>): [any, IPatch[]]
+  (parameter: IModifyFunction<T>): [any, IPatch[]]
 } & { _hook: State<T> }
 export function state<T = undefined>(): {
   (): T
-  (paramter: IModifyFunction<T | undefined>): [any, IPatch[]]
+  (parameter: IModifyFunction<T | undefined>): [any, IPatch[]]
 } & { _hook: State<T | undefined> }
 export function state(initialValue?: any) {
   if (!currentRunnerScope) {
@@ -2068,15 +2077,15 @@ export function signal<T>(
 ): (() => T) & { _hook: Computed<T> }
 export function signal<T>(initialValue: T): {
   (): T
-  (paramter: IModifyFunction<T>): [any, IPatch[]]
+  (parameter: IModifyFunction<T>): [any, IPatch[]]
 } & { _hook: State<T> }
 export function signal<T = undefined>(): {
   (): T
-  (paramter: IModifyFunction<T | undefined>): [any, IPatch[]]
+  (parameter: IModifyFunction<T | undefined>): [any, IPatch[]]
 } & { _hook: State<T | undefined> }
 export function signal<T>(v: null): {
   (): T
-  (paramter: IModifyFunction<T | undefined>): [any, IPatch[]]
+  (parameter: IModifyFunction<T | undefined>): [any, IPatch[]]
 } & { _hook: State<T | undefined> }
 export function signal(v?: any) {
   if (isFunc(v)) {
