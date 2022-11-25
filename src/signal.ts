@@ -1758,14 +1758,14 @@ function createUnaccessGetter<T>(index: number) {
   return newF
 }
 
-type IModifyFunction<T> = (draft: Draft<T>) => void
+type IModifyFunction<T> = ((draft: Draft<T>) => void) | T
 
 function createStateSetterGetterFunc<SV>(s: State<SV>): {
   (): SV
   (parameter: IModifyFunction<SV>): [SV, IPatch[]]
 } {
   return (parameter?: any): any => {
-    if (parameter) {
+    if (isDef(parameter)) {
       let result: SV; 
       let patches = []
       if (isFunc(parameter)) {
@@ -1800,7 +1800,7 @@ function createCacheSetterGetterFunc<SV>(c: Cache<SV>): {
   (parameter: IModifyFunction<SV>): [SV, IPatch[]]
 } {
   return (parameter?: any): any => {
-    if (parameter) {
+    if (isDef(parameter)) {
       let result: SV | Symbol; 
       let patches = []
       if (isFunc(parameter)) {
@@ -2079,14 +2079,14 @@ export function signal<T>(initialValue: T): {
   (): T
   (parameter: IModifyFunction<T>): [any, IPatch[]]
 } & { _hook: State<T> }
-export function signal<T = undefined>(): {
-  (): T
-  (parameter: IModifyFunction<T | undefined>): [any, IPatch[]]
-} & { _hook: State<T | undefined> }
 export function signal<T>(v: null): {
   (): T
   (parameter: IModifyFunction<T | undefined>): [any, IPatch[]]
 } & { _hook: State<T | undefined> }
+// export function signal<T = undefined>(): {
+//   (): T
+//   (parameter: IModifyFunction<T | undefined>): [any, IPatch[]]
+// } & { _hook: State<T | undefined> }
 export function signal(v?: any) {
   if (isFunc(v)) {
     return computed(v)

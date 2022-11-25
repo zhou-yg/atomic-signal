@@ -17,6 +17,10 @@ describe('state', () => {
   
       expect(result.s1()).toEqual(args[0])
       expect(result.s2()).toEqual(args[1])
+
+      result.s1({ num1: 1 })
+
+      expect(result.s1()).toEqual({ num1: 1 })
     })
     it('watch state changing', () => {
       const runner = new Runner(mockBM.plainObjectState)

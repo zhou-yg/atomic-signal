@@ -13,7 +13,7 @@ describe('cache', () => {
       getPlugin('Cache').clearValue(null as any, '', 'cookie')
     })
   
-    it ('simple cache', async () => {
+    it('simple cache', async () => {
       const runner = new Runner(mockBM.onlyCache)
       const result = runner.init()
   
@@ -22,6 +22,11 @@ describe('cache', () => {
       const cVal = result.c()
   
       expect(cVal).toBe(undefined)
+
+      result.c({ num: 0 })
+      const c2 = result.c()
+
+      expect(c2).toEqual({ num: 0 })
     })
     it('update cache data', async () => {
       const runner = new Runner(mockBM.onlyCache)
