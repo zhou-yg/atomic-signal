@@ -2008,14 +2008,13 @@ function mountInputCompute(func: any) {
  * export factory method
  * 
  */
-export function state<T>(initialValue: T): {
+type StateGetterAndSetter<T> = {
   (): T
   (parameter: IModifyFunction<T>): [any, IPatch[]]
 } & { _hook: State<T> }
-export function state<T = undefined>(): {
-  (): T
-  (parameter: IModifyFunction<T | undefined>): [any, IPatch[]]
-} & { _hook: State<T | undefined> }
+
+export function state<T>(initialValue: T): StateGetterAndSetter<T>
+export function state<T = undefined>(): StateGetterAndSetter<T | undefined>
 export function state(initialValue?: any) {
   if (!currentRunnerScope) {
     throw new Error('[state] must under a tarat runner')
@@ -2023,15 +2022,16 @@ export function state(initialValue?: any) {
   return currentHookFactory.state(initialValue)
 }
 
+type ComputedGetter<T> = (() => T) & { _hook: Computed<T> }
 export function computed<T>(
   fn: FComputedFuncGenerator<T>
-): (() => T) & { _hook: Computed<T> }
+): ComputedGetter<T>
 export function computed<T>(
   fn: FComputedFuncAsync<T>
-): (() => T) & { _hook: Computed<T> }
+): ComputedGetter<T>
 export function computed<T>(
   fn: FComputedFunc<T>
-): (() => T) & { _hook: Computed<T> }
+): ComputedGetter<T>
 export function computed<T>(fn: any): any {
   if (!currentRunnerScope) {
     throw new Error('[computed] must under a tarat runner')
@@ -2065,24 +2065,20 @@ export function cache<T>(key: string, options: ICacheOptions<T>) {
 }
 
 // alias
+export type ComputedSignal<T> = ComputedGetter<T>
+export type StateSignal<T> = StateGetterAndSetter<T>
 
 export function signal<T>(
   fn: FComputedFuncGenerator<T>
-): (() => T) & { _hook: Computed<T> }
+): ComputedSignal<T>
 export function signal<T>(
   fn: FComputedFuncAsync<T>
-): (() => T) & { _hook: Computed<T> }
+): ComputedSignal<T>
 export function signal<T>(
   fn: FComputedFunc<T>
-): (() => T) & { _hook: Computed<T> }
-export function signal<T>(initialValue: T): {
-  (): T
-  (parameter: IModifyFunction<T>): [any, IPatch[]]
-} & { _hook: State<T> }
-export function signal<T>(v: null): {
-  (): T
-  (parameter: IModifyFunction<T | undefined>): [any, IPatch[]]
-} & { _hook: State<T | undefined> }
+): ComputedSignal<T>
+export function signal<T>(initialValue: T): StateSignal<T>
+export function signal<T>(v: null): StateSignal<T>
 // export function signal<T = undefined>(): {
 //   (): T
 //   (parameter: IModifyFunction<T | undefined>): [any, IPatch[]]
