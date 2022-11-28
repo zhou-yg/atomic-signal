@@ -15,7 +15,7 @@ import {
   compose,
   progress,
   signal,
-  action,
+  action
 } from '../src/'
 import { loadPlugin } from '../src/plugin'
 
@@ -92,13 +92,13 @@ export function wait(ms: number = 15) {
   return new Promise(r => setTimeout(r, ms))
 }
 /**
- * 
+ *
  * some mock drivers
- * 
+ *
  */
 export function blank() {}
 
-export function oneSignal () {
+export function oneSignal() {
   const s1 = signal(1)
   const s2 = signal(() => {
     return s1() + 1
@@ -110,7 +110,9 @@ export function oneSignal () {
   })
 
   return {
-    s1, s2, s3,
+    s1,
+    s2,
+    s3
   }
 }
 

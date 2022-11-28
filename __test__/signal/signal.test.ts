@@ -1,5 +1,6 @@
 import {
   Computed,
+  isSignal,
   Runner, State,
 } from '../../src'
 
@@ -15,5 +16,11 @@ describe('signal', () => {
     expect(initResult.s2._hook).toBeInstanceOf(Computed)
     expect(initResult.s3._hook).toBeInstanceOf(State)
     expect(initResult.s3._hook).not.toBeInstanceOf(Computed)
+
+    const r1 = isSignal(initResult.s1)
+    const r2 = isSignal(initResult.s2)
+
+    expect(r1).toBeTruthy()
+    expect(r2).toBeTruthy()
   })
 })

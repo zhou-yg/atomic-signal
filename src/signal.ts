@@ -32,10 +32,7 @@ import {
   get,
   getNamespace
 } from './util'
-import {
-  getPlugin,
-  TCacheFrom
-} from './plugin'
+import { getPlugin, TCacheFrom } from './plugin'
 import EventEmitter from 'eventemitter3'
 import * as immer from 'immer'
 import type { Draft } from 'immer'
@@ -124,6 +121,10 @@ export function isState(h: { _hook?: State }) {
   return h && (h._hook ? h._hook instanceof State : h instanceof State)
 }
 
+export function isSignal(h: { _hook?: State | Computed<any> }) {
+  return h?._hook && (h._hook instanceof Computed || h._hook instanceof State)
+}
+
 enum EHookEvents {
   change = 'change',
   beforeCalling = 'beforeCalling',
@@ -165,7 +166,7 @@ export class State<T = any> extends Hook {
 
   contextName = 'state'
   needContextValue = true
-  
+
   needCheckAndRefresh = false
 
   applyComputeAsync = false
@@ -277,8 +278,7 @@ export class State<T = any> extends Hook {
     }
   }
 
-  checkAndRefresh () {
-  }
+  checkAndRefresh() {}
 }
 
 type TStateKey = string
@@ -368,7 +368,7 @@ export class AsyncState<T> extends State<T> implements AsyncHook<T> {
 /**
  * check if running inside a computed
  */
- let currentComputedStack: Computed<any>[] = []
+let currentComputedStack: Computed<any>[] = []
 
 function underComputed() {
   return currentComputedStack.length > 0
@@ -477,190 +477,188 @@ export class Computed<T> extends AsyncState<T | Symbol> implements ITarget<T> {
     this.run(reactiveChain?.addNotify(this))
   }
 
-  addDep (source: ISource<T>, path: (string | number)[]) {
+  addDep(source: ISource<T>, path: (string | number)[]) {
     this.watcher.addDep(source, path)
   }
 }
 
-
 /**
  * control global InputCompute while running
  */
- let currentInputeCompute: InputCompute | null = null
- const inputComputeStack: InputCompute[] = []
- 
- function pushInputComputeStack(ic: InputCompute) {
-   inputComputeStack.push(ic)
-   currentInputeCompute = ic
- }
- function popInputComputeStack() {
-   currentInputeCompute = inputComputeStack[inputComputeStack.length - 2]
-   return inputComputeStack.pop()
- }
- 
+let currentInputeCompute: InputCompute | null = null
+const inputComputeStack: InputCompute[] = []
+
+function pushInputComputeStack(ic: InputCompute) {
+  inputComputeStack.push(ic)
+  currentInputeCompute = ic
+}
+function popInputComputeStack() {
+  currentInputeCompute = inputComputeStack[inputComputeStack.length - 2]
+  return inputComputeStack.pop()
+}
+
 type InputComputeFn<T extends any[]> = (...arg: T) => void
 type AsyncInputComputeFn<T extends any[]> = (...arg: T) => Promise<void>
 type GeneratorInputComputeFn<T extends any[]> = (
   ...arg: T
 ) => Generator<unknown, void, T>
 
+export class InputCompute<P extends any[] = any> extends Hook {
+  commitPromise: Promise<void> | null = null
+  constructor(
+    public getter:
+      | InputComputeFn<P>
+      | AsyncInputComputeFn<P>
+      | GeneratorInputComputeFn<P>,
+    /** @TODO should not couple the "scope" */
+    public scope: CurrentRunnerScope
+  ) {
+    super()
+  }
+  inputFuncStart() {}
+  commitComputePatches(
+    reactiveChain?: ReactiveChain
+  ): (void | Promise<void>)[] | undefined {
+    if (this.commitPromise) {
+      this.commitPromise = this.commitPromise.then(() => {
+        const r = this.scope.applyAllComputePatches(this, reactiveChain)
+        if (r?.some(p => isPromise(p))) {
+          return Promise.all(r).then()
+        }
+      })
+      return [this.commitPromise]
+    }
+    const r = this.scope.applyAllComputePatches(this, reactiveChain)
+    if (r?.some(p => isPromise(p))) {
+      this.commitPromise = Promise.all(r).then()
+    }
+    return r
+  }
+  inputFuncEnd(reactiveChain?: ReactiveChain): Promise<void> {
+    const r = this.commitComputePatches(reactiveChain)
+    unFreeze({ _hook: this })
+    this.emit(EHookEvents.afterCalling, this)
 
- export class InputCompute<P extends any[] = any> extends Hook {
-   commitPromise: Promise<void> | null = null
-   constructor(
-     public getter:
-       | InputComputeFn<P>
-       | AsyncInputComputeFn<P>
-       | GeneratorInputComputeFn<P>,
-     /** @TODO should not couple the "scope" */
-     public scope: CurrentRunnerScope
-   ) {
-     super()
-   }
-   inputFuncStart() {}
-   commitComputePatches(
-     reactiveChain?: ReactiveChain
-   ): (void | Promise<void>)[] | undefined {
-     if (this.commitPromise) {
-       this.commitPromise = this.commitPromise.then(() => {
-         const r = this.scope.applyAllComputePatches(this, reactiveChain)
-         if (r?.some(p => isPromise(p))) {
-           return Promise.all(r).then()
-         }
-       })
-       return [this.commitPromise]
-     }
-     const r = this.scope.applyAllComputePatches(this, reactiveChain)
-     if (r?.some(p => isPromise(p))) {
-       this.commitPromise = Promise.all(r).then()
-     }
-     return r
-   }
-   inputFuncEnd(reactiveChain?: ReactiveChain): Promise<void> {
-     const r = this.commitComputePatches(reactiveChain)
-     unFreeze({ _hook: this })
-     this.emit(EHookEvents.afterCalling, this)
- 
-     if (r?.some(p => isPromise(p))) {
-       return Promise.all(r).then(r => {
-         this.commitPromise = null
-       })
-     }
-     return Promise.resolve()
-   }
- 
-   async run(...args: any): Promise<void> {
-     this.emit(EHookEvents.beforeCalling, this)
-     const isFreeze = checkFreeze({ _hook: this })
-     if (isFreeze) {
-       return
-     }
- 
-     // confirm：the composed inputCompute still running under the parent inputCompute
-     // if (!currentInputeCompute) {
-     //   currentInputeCompute = this
-     // }
- 
-     // means that current IC is nested in other IC.
-     if (currentInputeCompute) {
-       const r = currentInputeCompute.commitComputePatches(currentReactiveChain)
-       if (r?.some(p => isPromise(p))) {
-         await Promise.all(r)
-       }
-     }
- 
-     pushInputComputeStack(this)
- 
-     const newReactiveChain = currentReactiveChain?.addCall(this)
-     const funcResult = ReactiveChain.withChain(newReactiveChain, () => {
-       return this.getter(...args)
-     })
- 
-     popInputComputeStack()
- 
-     // if (currentInputeCompute === this) {
-     //   currentInputeCompute = null
-     // }
- 
-     log(
-       '[InputCompute.run]',
-       `isGen=${isGenerator(funcResult)}`,
-       `isP=${isPromise(funcResult)}`
-     )
-     // use generator
-     if (isGenerator(funcResult)) {
-       let generatorPreservedCurrentReactiveChain: ReactiveChain | undefined
-       await runGenerator(
-         funcResult as Generator<void>,
-         // enter: start/resume
-         () => {
-           // if (!currentInputeCompute) {
-           //   currentInputeCompute = this
-           // }
-           pushInputComputeStack(this)
- 
-           generatorPreservedCurrentReactiveChain = currentReactiveChain
-           currentReactiveChain = newReactiveChain
-         },
-         // leave: stop/suspend
-         () => {
-           // tip: inputCompute supporting nestly compose other inputCompute
-           // if (currentInputeCompute === this) {
-           //   currentInputeCompute = null
-           // }
-           popInputComputeStack()
- 
-           currentReactiveChain = generatorPreservedCurrentReactiveChain
-         }
-       )
-       return this.inputFuncEnd(newReactiveChain)
-     } else if (isPromise(funcResult)) {
-       // end compute context in advance
- 
-       await funcResult
- 
-       return this.inputFuncEnd(newReactiveChain)
-     }
-     if (currentInputeCompute === this) {
-       currentInputeCompute = null
-     }
-     return this.inputFuncEnd(newReactiveChain)
-   }
- }
- 
- class AsyncInputCompute<T extends any[]>
-   extends InputCompute<T>
-   implements AsyncHook<T>
- {
-   init = true
-   getterPromise: Promise<T> | null = null
-   asyncCount: number = 0
-   startAsyncGetter() {
-     this.asyncCount++
-     let currentCount = this.asyncCount
-     this.init = false
-     let resolve: Function
-     this.getterPromise = new Promise(r => (resolve = r))
- 
-     return {
-       end: () => {
-         resolve()
-         this.getterPromise = null
-       },
-       valid: () => {
-         return this.asyncCount <= currentCount
-       }
-     }
-   }
-   get pending(): boolean {
-     return !!this.getterPromise
-   }
- }
+    if (r?.some(p => isPromise(p))) {
+      return Promise.all(r).then(r => {
+        this.commitPromise = null
+      })
+    }
+    return Promise.resolve()
+  }
+
+  async run(...args: any): Promise<void> {
+    this.emit(EHookEvents.beforeCalling, this)
+    const isFreeze = checkFreeze({ _hook: this })
+    if (isFreeze) {
+      return
+    }
+
+    // confirm：the composed inputCompute still running under the parent inputCompute
+    // if (!currentInputeCompute) {
+    //   currentInputeCompute = this
+    // }
+
+    // means that current IC is nested in other IC.
+    if (currentInputeCompute) {
+      const r = currentInputeCompute.commitComputePatches(currentReactiveChain)
+      if (r?.some(p => isPromise(p))) {
+        await Promise.all(r)
+      }
+    }
+
+    pushInputComputeStack(this)
+
+    const newReactiveChain = currentReactiveChain?.addCall(this)
+    const funcResult = ReactiveChain.withChain(newReactiveChain, () => {
+      return this.getter(...args)
+    })
+
+    popInputComputeStack()
+
+    // if (currentInputeCompute === this) {
+    //   currentInputeCompute = null
+    // }
+
+    log(
+      '[InputCompute.run]',
+      `isGen=${isGenerator(funcResult)}`,
+      `isP=${isPromise(funcResult)}`
+    )
+    // use generator
+    if (isGenerator(funcResult)) {
+      let generatorPreservedCurrentReactiveChain: ReactiveChain | undefined
+      await runGenerator(
+        funcResult as Generator<void>,
+        // enter: start/resume
+        () => {
+          // if (!currentInputeCompute) {
+          //   currentInputeCompute = this
+          // }
+          pushInputComputeStack(this)
+
+          generatorPreservedCurrentReactiveChain = currentReactiveChain
+          currentReactiveChain = newReactiveChain
+        },
+        // leave: stop/suspend
+        () => {
+          // tip: inputCompute supporting nestly compose other inputCompute
+          // if (currentInputeCompute === this) {
+          //   currentInputeCompute = null
+          // }
+          popInputComputeStack()
+
+          currentReactiveChain = generatorPreservedCurrentReactiveChain
+        }
+      )
+      return this.inputFuncEnd(newReactiveChain)
+    } else if (isPromise(funcResult)) {
+      // end compute context in advance
+
+      await funcResult
+
+      return this.inputFuncEnd(newReactiveChain)
+    }
+    if (currentInputeCompute === this) {
+      currentInputeCompute = null
+    }
+    return this.inputFuncEnd(newReactiveChain)
+  }
+}
+
+class AsyncInputCompute<T extends any[]>
+  extends InputCompute<T>
+  implements AsyncHook<T>
+{
+  init = true
+  getterPromise: Promise<T> | null = null
+  asyncCount: number = 0
+  startAsyncGetter() {
+    this.asyncCount++
+    let currentCount = this.asyncCount
+    this.init = false
+    let resolve: Function
+    this.getterPromise = new Promise(r => (resolve = r))
+
+    return {
+      end: () => {
+        resolve()
+        this.getterPromise = null
+      },
+      valid: () => {
+        return this.asyncCount <= currentCount
+      }
+    }
+  }
+  get pending(): boolean {
+    return !!this.getterPromise
+  }
+}
 
 /**
  * ScopeContext designed for serialization
  */
- export class RunnerContext<T extends Driver> {
+export class RunnerContext<T extends Driver> {
   // snapshot
   initialArgList: Parameters<T>
   initialData: IHookContext['data'] | null = null
@@ -698,7 +696,7 @@ type GeneratorInputComputeFn<T extends any[]> = (
     }
   }
 
-  bindScope (scope: CurrentRunnerScope) {
+  bindScope(scope: CurrentRunnerScope) {
     this.scope = scope
   }
 
@@ -715,7 +713,11 @@ type GeneratorInputComputeFn<T extends any[]> = (
         }
         if (hook instanceof State) {
           if (hook.needContextValue) {
-            return [hook.contextName, getValueSilently(hook), hook.modifiedTimstamp]
+            return [
+              hook.contextName,
+              getValueSilently(hook),
+              hook.modifiedTimstamp
+            ]
           }
           return [hook.contextName]
         }
@@ -821,7 +823,7 @@ export class Runner<T extends Driver> {
   options: IRunnerOptions = {
     beleiveContext: false,
     updateCallbackSync: false,
-    applyComputeParalle: false,
+    applyComputeParalle: false
     // modelIndexes: undefined
   }
   constructor(public driver: T, options?: IRunnerOptions) {
@@ -1051,7 +1053,7 @@ export class Cache<T> extends AsyncState<T | Symbol> {
     }
   }
 
-  addDep (source: ISource<T>, path: (string | number)[]) {
+  addDep(source: ISource<T>, path: (string | number)[]) {
     this.watcher.addDep(source, path)
   }
 }
@@ -1137,7 +1139,7 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
     }
   }
 
-  triggerEnterComposeDriver (driverNamespace: string, dirverName: string) {
+  triggerEnterComposeDriver(driverNamespace: string, dirverName: string) {
     this.emit(CurrentRunnerScope.events.enterComposeDriver, {
       driverNamespace,
       dirverName
@@ -1146,7 +1148,7 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
       this.emit(CurrentRunnerScope.events.leaveComposeDriver, {
         driverNamespace,
         dirverName
-      })  
+      })
     }
   }
 
@@ -1154,7 +1156,7 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
     Object.assign(this, op)
   }
 
-  effect(f: (Function)) {
+  effect(f: Function) {
     this.once(CurrentRunnerScope.events.effect, (rc: ReactiveChain) => {
       f(rc)
     })
@@ -1173,7 +1175,7 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
     const hook = this.hooks[hookIndex]
     if (hook) {
       // if (hook instanceof Model) {
-      // } else 
+      // } else
       if (hook instanceof Computed) {
         currentReactiveChain = currentReactiveChain?.add(this)
         hook.run(currentReactiveChain)
@@ -1191,8 +1193,7 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
   activate() {
     this.notifyAllState()
   }
-  deactivate() {
-  }
+  deactivate() {}
 
   private notifyAllState() {
     this.hooks.forEach(h => {
@@ -1222,7 +1223,7 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
       })
     }
   }
-  addDep (source: ISource<T>, path: (string | number)[]) {
+  addDep(source: ISource<T>, path: (string | number)[]) {
     this.watcher.addDep(source, path)
   }
 
@@ -1265,9 +1266,11 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
           triggerHook = this.hooks[triggerHookIndex]
         }
         if (triggerHook) {
-          // make sure the hook had implement ITarget interface 
+          // make sure the hook had implement ITarget interface
           if ('addDep' in this.hooks[hookIndex]) {
-            ;(this.hooks[hookIndex] as unknown as ITarget<any>).addDep(triggerHook)
+            ;(this.hooks[hookIndex] as unknown as ITarget<any>).addDep(
+              triggerHook
+            )
           }
         }
       })
@@ -1420,12 +1423,25 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
         const newChildChain = reactiveChain?.addUpdate(h as State)
 
         if (applyComputeParalle || !(h as State).applyComputeAsync) {
-          return (h as State).applyComputePatches(currentInputCompute, newChildChain)
+          return (h as State).applyComputePatches(
+            currentInputCompute,
+            newChildChain
+          )
         }
 
         prevPromise = prevPromise
-          ? prevPromise.then(() => (h as State).applyComputePatches(currentInputCompute, newChildChain))
-          : Promise.resolve((h as State).applyComputePatches(currentInputCompute, newChildChain))
+          ? prevPromise.then(() =>
+              (h as State).applyComputePatches(
+                currentInputCompute,
+                newChildChain
+              )
+            )
+          : Promise.resolve(
+              (h as State).applyComputePatches(
+                currentInputCompute,
+                newChildChain
+              )
+            )
         return prevPromise
       })
     }
@@ -1509,167 +1525,166 @@ let currentRunnerScope: CurrentRunnerScope<Driver> | null = null
 /**
  *
  */
- let currentReactiveChain: ReactiveChain | undefined = undefined
- export function startdReactiveChain(name: string = 'root') {
-   currentReactiveChain = new ReactiveChain()
-   currentReactiveChain.isRoot = true
-   currentReactiveChain.name = name
-   return currentReactiveChain
- }
- export function stopReactiveChain() {
-   currentReactiveChain = undefined
- }
+let currentReactiveChain: ReactiveChain | undefined = undefined
+export function startdReactiveChain(name: string = 'root') {
+  currentReactiveChain = new ReactiveChain()
+  currentReactiveChain.isRoot = true
+  currentReactiveChain.name = name
+  return currentReactiveChain
+}
+export function stopReactiveChain() {
+  currentReactiveChain = undefined
+}
 
- /**
-  * collect reactive chain for debug
-  */
- type ChainTrigger<T> = CurrentRunnerScope<any> | State<T> | InputCompute<any>
- export class ReactiveChain<T = any> {
-   isRoot = false
-   allLeafCount = 0
-   order: number = 0
-   name?: string
-   hookIndex?: number
-   hookKey?: string
-   oldValue: T | undefined
-   newValue: T | undefined
-   hasNewValue: boolean = false
-   children: ReactiveChain<T>[] = []
-   type?: 'update' | 'notify' | 'call'
+/**
+ * collect reactive chain for debug
+ */
+type ChainTrigger<T> = CurrentRunnerScope<any> | State<T> | InputCompute<any>
+export class ReactiveChain<T = any> {
+  isRoot = false
+  allLeafCount = 0
+  order: number = 0
+  name?: string
+  hookIndex?: number
+  hookKey?: string
+  oldValue: T | undefined
+  newValue: T | undefined
+  hasNewValue: boolean = false
+  children: ReactiveChain<T>[] = []
+  type?: 'update' | 'notify' | 'call'
 
-   static getCurrent = () => currentReactiveChain
+  static getCurrent = () => currentReactiveChain
 
-   constructor(public parent?: ReactiveChain, public hook?: ChainTrigger<T>) {
-     this.order = parent?.plusLeaf() || 0
- 
-     if (hook instanceof State) {
-       this.oldValue = hook._internalValue
-     }
-   }
-   static withChain<T extends (...args: any[]) => any>(
-     chain: ReactiveChain,
-     fn: T
-   ): ReturnType<T> {
-     const oldCurrentReactiveChain = currentReactiveChain
-     currentReactiveChain = chain
- 
-     const r = fn()
- 
-     currentReactiveChain = oldCurrentReactiveChain
-     return r
-   }
-   plusLeaf() {
-     if (this.isRoot) {
-       this.allLeafCount += 1
-       return this.allLeafCount
-     }
-     return this.parent.plusLeaf()
-   }
-   stop() {
-     stopReactiveChain()
-   }
-   update() {
-     if (this.hook instanceof State) {
-       this.hasNewValue = true
-       this.newValue = this.hook._internalValue
-     }
-   }
-   add(trigger: ChainTrigger<T>, key?: string): ReactiveChain<T> {
-     const childChain = new ReactiveChain(this, trigger)
-     childChain.hookKey = key
-     this.children.push(childChain)
- 
-     if (currentRunnerScope) {
-       if (trigger instanceof Hook) {
-         const index = currentRunnerScope.hooks.indexOf(trigger)
-         if (index > -1) {
-           childChain.hookIndex = index
-         }
-       }
-     }
-     return childChain
-   }
-   addCall(trigger: ChainTrigger<T>, key?: string): ReactiveChain<T> {
-     const childChain = this.add(trigger, key)
-     childChain.type = 'call'
-     return childChain
-   }
-   addNotify(trigger: ChainTrigger<T>): ReactiveChain<T> {
-     const childChain = this.add(trigger)
-     childChain.type = 'notify'
-     return childChain
-   }
-   addUpdate(child: ChainTrigger<T>): ReactiveChain<T> {
-     const childChain = this.add(child)
-     childChain.type = 'update'
-     return childChain
-   }
-   print() {
-     const preLink = '|--> '
-     const preDec = '|-- '
-     const preHasNextSpace = '|  '
-     const preSpace = '   '
- 
-     function dfi(current: ReactiveChain) {
-       const isRunnerScope = current.hook instanceof CurrentRunnerScope
-       let currentName = current.hook?.constructor.name || current.name || ''
-       if (isRunnerScope) {
-         currentName = `\x1b[32m${currentName}\x1b[0m`
-       }
-       if (current.hook?.name) {
-         currentName = `${currentName}(${current.hook?.name}${
-           current.hookKey ? '.' + current.hookKey : ''
-         })`
-       } else if (isDef(current.hookIndex)) {
-         currentName = `${currentName}(${current.hookIndex})`
-       }
-       if (current.type) {
-         currentName = `${current.type}: ${currentName}`
-       }
-       currentName = `\x1b[32m${current.order}\x1b[0m.${currentName}`
- 
-       const currentRows = [currentName]
-       if (shortValue(current.oldValue)) {
-         currentRows.push(`${preDec}cur=${shortValue(current.oldValue)}`)
-       } else {
-         currentRows.push(`${preDec}cur=${JSON.stringify(current.oldValue)}`)
-       }
-       if (current.hasNewValue) {
-         if (shortValue(current.newValue)) {
-           currentRows.push(`${preDec}new=${shortValue(current.newValue)}`)
-         } else {
-           currentRows.push(`${preDec}new=${JSON.stringify(current.newValue)}`)
-         }
-       }
- 
-       if (current.children.length > 0) {
-         const names = current.children.map(dfi)
-         const rows: string[] = []
-         names.forEach((arr, i) => {
-           arr.forEach((childName, j) => {
-             if (j === 0) {
-               rows.push(`${preLink}${childName}`)
-             } else {
-               if (names[i + 1]) {
-                 rows.push(`${preHasNextSpace}${childName}`)
-               } else {
-                 rows.push(`${preSpace}${childName}`)
-               }
-             }
-           })
-         })
-         return [...currentRows, ...rows]
-       }
-       return [...currentRows]
-     }
-     const logRows = dfi(this)
-     // console the chain log
-     console.log(logRows.join('\n'))
-   }
- }
- 
+  constructor(public parent?: ReactiveChain, public hook?: ChainTrigger<T>) {
+    this.order = parent?.plusLeaf() || 0
 
- /**
+    if (hook instanceof State) {
+      this.oldValue = hook._internalValue
+    }
+  }
+  static withChain<T extends (...args: any[]) => any>(
+    chain: ReactiveChain,
+    fn: T
+  ): ReturnType<T> {
+    const oldCurrentReactiveChain = currentReactiveChain
+    currentReactiveChain = chain
+
+    const r = fn()
+
+    currentReactiveChain = oldCurrentReactiveChain
+    return r
+  }
+  plusLeaf() {
+    if (this.isRoot) {
+      this.allLeafCount += 1
+      return this.allLeafCount
+    }
+    return this.parent.plusLeaf()
+  }
+  stop() {
+    stopReactiveChain()
+  }
+  update() {
+    if (this.hook instanceof State) {
+      this.hasNewValue = true
+      this.newValue = this.hook._internalValue
+    }
+  }
+  add(trigger: ChainTrigger<T>, key?: string): ReactiveChain<T> {
+    const childChain = new ReactiveChain(this, trigger)
+    childChain.hookKey = key
+    this.children.push(childChain)
+
+    if (currentRunnerScope) {
+      if (trigger instanceof Hook) {
+        const index = currentRunnerScope.hooks.indexOf(trigger)
+        if (index > -1) {
+          childChain.hookIndex = index
+        }
+      }
+    }
+    return childChain
+  }
+  addCall(trigger: ChainTrigger<T>, key?: string): ReactiveChain<T> {
+    const childChain = this.add(trigger, key)
+    childChain.type = 'call'
+    return childChain
+  }
+  addNotify(trigger: ChainTrigger<T>): ReactiveChain<T> {
+    const childChain = this.add(trigger)
+    childChain.type = 'notify'
+    return childChain
+  }
+  addUpdate(child: ChainTrigger<T>): ReactiveChain<T> {
+    const childChain = this.add(child)
+    childChain.type = 'update'
+    return childChain
+  }
+  print() {
+    const preLink = '|--> '
+    const preDec = '|-- '
+    const preHasNextSpace = '|  '
+    const preSpace = '   '
+
+    function dfi(current: ReactiveChain) {
+      const isRunnerScope = current.hook instanceof CurrentRunnerScope
+      let currentName = current.hook?.constructor.name || current.name || ''
+      if (isRunnerScope) {
+        currentName = `\x1b[32m${currentName}\x1b[0m`
+      }
+      if (current.hook?.name) {
+        currentName = `${currentName}(${current.hook?.name}${
+          current.hookKey ? '.' + current.hookKey : ''
+        })`
+      } else if (isDef(current.hookIndex)) {
+        currentName = `${currentName}(${current.hookIndex})`
+      }
+      if (current.type) {
+        currentName = `${current.type}: ${currentName}`
+      }
+      currentName = `\x1b[32m${current.order}\x1b[0m.${currentName}`
+
+      const currentRows = [currentName]
+      if (shortValue(current.oldValue)) {
+        currentRows.push(`${preDec}cur=${shortValue(current.oldValue)}`)
+      } else {
+        currentRows.push(`${preDec}cur=${JSON.stringify(current.oldValue)}`)
+      }
+      if (current.hasNewValue) {
+        if (shortValue(current.newValue)) {
+          currentRows.push(`${preDec}new=${shortValue(current.newValue)}`)
+        } else {
+          currentRows.push(`${preDec}new=${JSON.stringify(current.newValue)}`)
+        }
+      }
+
+      if (current.children.length > 0) {
+        const names = current.children.map(dfi)
+        const rows: string[] = []
+        names.forEach((arr, i) => {
+          arr.forEach((childName, j) => {
+            if (j === 0) {
+              rows.push(`${preLink}${childName}`)
+            } else {
+              if (names[i + 1]) {
+                rows.push(`${preHasNextSpace}${childName}`)
+              } else {
+                rows.push(`${preSpace}${childName}`)
+              }
+            }
+          })
+        })
+        return [...currentRows, ...rows]
+      }
+      return [...currentRows]
+    }
+    const logRows = dfi(this)
+    // console the chain log
+    console.log(logRows.join('\n'))
+  }
+}
+
+/**
  *
  *
  *
@@ -1693,7 +1708,7 @@ export const mountHookFactory = {
 
   // alias
   signal,
-  action: mountInputCompute,
+  action: mountInputCompute
 }
 export const updateHookFactory = {
   state: updateState,
@@ -1703,7 +1718,7 @@ export const updateHookFactory = {
   inputCompute: updateInputCompute,
   // alias
   signal,
-  action: updateInputCompute,
+  action: updateInputCompute
 }
 
 export let currentHookFactory: {
@@ -1714,7 +1729,7 @@ export let currentHookFactory: {
   inputCompute: typeof mountInputCompute
   // alias
   signal: typeof signal
-  action: typeof mountInputCompute,
+  action: typeof mountInputCompute
 } = mountHookFactory
 
 export const hookFactoryFeatures = {
@@ -1725,16 +1740,11 @@ export const hookFactoryFeatures = {
   /**
    * need other hook as data source
    */
-  withSource: [
-    'cache'
-  ],
+  withSource: ['cache'],
   /**
    * manual calling by User or System
    */
-  initiativeCompute: [
-    'inputCompute',
-    'action'
-  ],
+  initiativeCompute: ['inputCompute', 'action']
 }
 
 function updateValidation() {
@@ -1766,7 +1776,7 @@ function createStateSetterGetterFunc<SV>(s: State<SV>): {
 } {
   return (parameter?: any): any => {
     if (isDef(parameter)) {
-      let result: SV; 
+      let result: SV
       let patches = []
       if (isFunc(parameter)) {
         const r = produceWithPatches(s.value, parameter)
@@ -1801,7 +1811,7 @@ function createCacheSetterGetterFunc<SV>(c: Cache<SV>): {
 } {
   return (parameter?: any): any => {
     if (isDef(parameter)) {
-      let result: SV | Symbol; 
+      let result: SV | Symbol
       let patches = []
       if (isFunc(parameter)) {
         const r = produceWithPatches(c.value, parameter)
@@ -1914,7 +1924,6 @@ function mountCache<T>(key: string, options: ICacheOptions<T>) {
   return newSetterGetter
 }
 
-
 function updateComputed<T>(
   fn: FComputedFuncGenerator<T>
 ): (() => T) & { _hook: Computed<T> }
@@ -2004,9 +2013,9 @@ function mountInputCompute(func: any) {
 }
 
 /**
- * 
+ *
  * export factory method
- * 
+ *
  */
 type StateGetterAndSetter<T> = {
   (): T
@@ -2023,15 +2032,9 @@ export function state(initialValue?: any) {
 }
 
 type ComputedGetter<T> = (() => T) & { _hook: Computed<T> }
-export function computed<T>(
-  fn: FComputedFuncGenerator<T>
-): ComputedGetter<T>
-export function computed<T>(
-  fn: FComputedFuncAsync<T>
-): ComputedGetter<T>
-export function computed<T>(
-  fn: FComputedFunc<T>
-): ComputedGetter<T>
+export function computed<T>(fn: FComputedFuncGenerator<T>): ComputedGetter<T>
+export function computed<T>(fn: FComputedFuncAsync<T>): ComputedGetter<T>
+export function computed<T>(fn: FComputedFunc<T>): ComputedGetter<T>
 export function computed<T>(fn: any): any {
   if (!currentRunnerScope) {
     throw new Error('[computed] must under a tarat runner')
@@ -2068,15 +2071,9 @@ export function cache<T>(key: string, options: ICacheOptions<T>) {
 export type ComputedSignal<T> = ComputedGetter<T>
 export type StateSignal<T> = StateGetterAndSetter<T>
 
-export function signal<T>(
-  fn: FComputedFuncGenerator<T>
-): ComputedSignal<T>
-export function signal<T>(
-  fn: FComputedFuncAsync<T>
-): ComputedSignal<T>
-export function signal<T>(
-  fn: FComputedFunc<T>
-): ComputedSignal<T>
+export function signal<T>(fn: FComputedFuncGenerator<T>): ComputedSignal<T>
+export function signal<T>(fn: FComputedFuncAsync<T>): ComputedSignal<T>
+export function signal<T>(fn: FComputedFunc<T>): ComputedSignal<T>
 export function signal<T>(initialValue: T): StateSignal<T>
 export function signal<T>(v: null): StateSignal<T>
 // export function signal<T = undefined>(): {
@@ -2105,7 +2102,7 @@ export const action = inputCompute
  *
  */
 
- export function after(callback: () => void, targets: { _hook?: Hook }[]) {
+export function after(callback: () => void, targets: { _hook?: Hook }[]) {
   callback = makeBatchCallback(callback)
 
   targets.forEach(target => {
@@ -2157,7 +2154,7 @@ export function combineLatest<T>(
  * using another Driver inside of Driver
  * the important thing is that should consider how to compose their depsMap
  */
- export function compose<T extends Driver>(f: T, args?: any[]) {
+export function compose<T extends Driver>(f: T, args?: any[]) {
   if (!currentRunnerScope) {
     throw new Error('[compose] must run side of Driver')
   }
@@ -2183,7 +2180,7 @@ export function combineLatest<T>(
   const driverNamespace = getNamespace(f)
   log(
     '[compose] current = ',
-    currentRunnerScope.runnerContext.driverName,
+    currentRunnerScope.runnerContext.driverName
     // !!currentRunnerScope.modelIndexes
   )
   const leaveCompose = currentRunnerScope.triggerEnterComposeDriver(
