@@ -900,13 +900,14 @@ export class Runner<T extends Driver> {
   callHook(hookIndex: number, args: any[]) {
     return this.scope?.callHook(hookIndex, args)
   }
-  // same above
   state() {
     return this.scope.getState()
   }
-  // same above
   ready() {
     return this.scope?.ready()
+  }
+  dispose () {
+    return this.scope?.dispose()
   }
 }
 
@@ -1112,11 +1113,6 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
     runnerContext.bindScope(this)
 
     this.initializeHookSet()
-    this.disposeFuncArr.push(
-      statePatchEvents.subscribe(() => {
-        this.notifyAllState()
-      })
-    )
   }
   /**
    * copy context value into scope for updateXXX hook
@@ -1164,6 +1160,13 @@ export class CurrentRunnerScope<T extends Driver = any> extends EventEmitter {
   flushEffects() {
     const reactiveChain = currentReactiveChain?.add(this)
     this.emit(CurrentRunnerScope.events.effect, reactiveChain)
+  }
+
+  appendDispose (f: Function) {
+    this.disposeFuncArr.push(f)
+  }
+  dispose () {
+    this.disposeFuncArr.forEach(f => f())
   }
 
   /**
@@ -2218,4 +2221,11 @@ export function progress<T = any>(getter: {
       ? EScopeState.pending
       : EScopeState.idle
   })
+}
+
+export function dispose(f: Function) {
+  if (!currentRunnerScope) {
+    throw new Error('[dispose] must run inside of Driver')
+  }
+  currentRunnerScope.appendDispose(f)
 }

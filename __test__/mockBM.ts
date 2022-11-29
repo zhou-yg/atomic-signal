@@ -15,7 +15,8 @@ import {
   compose,
   progress,
   signal,
-  action
+  action,
+  dispose
 } from '../src/'
 import { loadPlugin } from '../src/plugin'
 
@@ -664,3 +665,14 @@ Object.assign(composeDeeplyThan2, {
     [1, 'icComposedState']
   ]
 })
+
+export function driverWithDispose() {
+  const myDisposeFunc = jest.fn(() => {
+
+  })
+  dispose(myDisposeFunc)
+
+  return {
+    myDisposeFunc
+  }
+}

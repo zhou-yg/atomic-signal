@@ -110,4 +110,13 @@ describe('runner basic', () => {
     expect(arg.s1Changed).toHaveBeenCalledTimes(1)
     expect(onRunnerUpdate).toHaveBeenCalledTimes(1)
   })
+
+  it('runner dispose', () => {
+    const runner = new Runner(mockBM.driverWithDispose)
+    const { myDisposeFunc } = runner.init()
+
+    runner.dispose()
+
+    expect(myDisposeFunc).toBeCalledTimes(1)
+  })
 })
