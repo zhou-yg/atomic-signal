@@ -171,7 +171,7 @@ export class State<T = any> extends Hook {
 
   applyComputeAsync = false
 
-  constructor(data: T, public scope?: CurrentRunnerScope) {
+  constructor(data: T) {
     super()
     this._internalValue = data
   }
@@ -401,10 +401,9 @@ export class Computed<T> extends AsyncState<T | Symbol> implements ITarget<T> {
     public getter:
       | FComputedFunc<T | Symbol>
       | FComputedFuncAsync<T | Symbol>
-      | FComputedFuncGenerator<T | Symbol>,
-    scope?: CurrentRunnerScope
+      | FComputedFuncGenerator<T | Symbol>
   ) {
-    super(ComputedInitialSymbol, scope)
+    super(ComputedInitialSymbol)
   }
 
   override get value(): T | Symbol {
@@ -940,7 +939,7 @@ export class Cache<T> extends AsyncState<T | Symbol> {
     public options: ICacheOptions<T>,
     public scope: CurrentRunnerScope
   ) {
-    super(CacheInitialSymbol, scope)
+    super(CacheInitialSymbol)
     this.getterKey = key // `tarat_cache_${scope.hookRunnerName}__${key}`
 
     if (this.options.source) {
@@ -1751,6 +1750,10 @@ export const hookFactoryFeatures = {
 }
 
 function updateValidation() {
+  if (!currentRunnerScope) {
+    throw new Error('[updateValidation] update hook must under a tarat runner')
+  }
+
   const { hooks, initialHooksSet } = currentRunnerScope!
   const currentIndex = hooks.length
   const valid = !initialHooksSet || initialHooksSet.has(currentIndex)
@@ -1855,7 +1858,7 @@ function updateState<T>(initialValue?: T) {
   }
   const timestamp =
     currentRunnerScope!.runnerContext.initialData![currentIndex]?.[2]
-  const hook = new State(initialValue, currentRunnerScope)
+  const hook = new State(initialValue)
   if (timestamp) {
     hook.modifiedTimstamp = timestamp
   }
@@ -1872,10 +1875,10 @@ function updateState<T>(initialValue?: T) {
 }
 
 function mountState<T>(initialValue?: T) {
-  const hook = new State(initialValue, currentRunnerScope)
+  const hook = new State(initialValue)
 
   const setterGetter = createStateSetterGetterFunc(hook)
-  currentRunnerScope!.addHook(hook)
+  currentRunnerScope?.addHook(hook)
   currentReactiveChain?.add(hook)
 
   const newSetterGetter = Object.assign(setterGetter, {
@@ -1895,7 +1898,7 @@ function updateCache<T>(key: string, options: ICacheOptions<T>) {
 
   /** @TODO cache maybe should has initial value */
   const hook = new Cache(key, options, currentRunnerScope!)
-  currentRunnerScope.addHook(hook)
+  currentRunnerScope!.addHook(hook)
 
   const initialValue: T =
     currentRunnerScope!.runnerContext.initialData![currentIndex]?.[1]
@@ -1917,7 +1920,7 @@ function updateCache<T>(key: string, options: ICacheOptions<T>) {
 }
 function mountCache<T>(key: string, options: ICacheOptions<T>) {
   const hook = new Cache(key, options, currentRunnerScope!)
-  currentRunnerScope.addHook(hook)
+  currentRunnerScope?.addHook(hook)
   currentReactiveChain?.add(hook)
 
   const setterGetter = createCacheSetterGetterFunc(hook)
@@ -1948,7 +1951,7 @@ function updateComputed<T>(fn: any): any {
   const timestamp =
     currentRunnerScope!.runnerContext.initialData![currentIndex]?.[2]
 
-  const hook = new Computed<T>(fn, currentRunnerScope)
+  const hook = new Computed<T>(fn)
   currentRunnerScope!.addHook(hook)
   // @TODO: update computed won't trigger
   hook._internalValue = initialValue
@@ -1977,8 +1980,8 @@ function mountComputed<T>(
   fn: FComputedFunc<T>
 ): (() => T) & { _hook: Computed<T> }
 function mountComputed<T>(fn: any): any {
-  const hook = new Computed<T>(fn, currentRunnerScope)
-  currentRunnerScope!.addHook(hook)
+  const hook = new Computed<T>(fn)
+  currentRunnerScope?.addHook(hook)
 
   currentReactiveChain?.add(hook)
 
@@ -2005,7 +2008,7 @@ function updateInputCompute(func: any) {
 }
 function mountInputCompute(func: any) {
   const hook = new InputCompute(func, currentRunnerScope)
-  currentRunnerScope.addHook(hook)
+  currentRunnerScope?.addHook(hook)
   currentReactiveChain?.add(hook)
   const wrapFunc = (...args: any) => {
     return hook.run(...args)
@@ -2028,9 +2031,6 @@ type StateGetterAndSetter<T> = {
 export function state<T>(initialValue: T): StateGetterAndSetter<T>
 export function state<T = undefined>(): StateGetterAndSetter<T | undefined>
 export function state(initialValue?: any) {
-  if (!currentRunnerScope) {
-    throw new Error('[state] must under a tarat runner')
-  }
   return currentHookFactory.state(initialValue)
 }
 
@@ -2039,9 +2039,6 @@ export function computed<T>(fn: FComputedFuncGenerator<T>): ComputedGetter<T>
 export function computed<T>(fn: FComputedFuncAsync<T>): ComputedGetter<T>
 export function computed<T>(fn: FComputedFunc<T>): ComputedGetter<T>
 export function computed<T>(fn: any): any {
-  if (!currentRunnerScope) {
-    throw new Error('[computed] must under a tarat runner')
-  }
   return currentHookFactory.computed<T>(fn)
 }
 
@@ -2063,10 +2060,6 @@ export function inputCompute(func: any) {
 }
 
 export function cache<T>(key: string, options: ICacheOptions<T>) {
-  if (!currentRunnerScope) {
-    throw new Error('[cache] must under a tarat runner')
-  }
-
   return currentHookFactory.cache<T>(key, options)
 }
 
@@ -2117,6 +2110,17 @@ export function after(callback: () => void, targets: { _hook?: Hook }[]) {
       }
     }
   })
+  return () => {
+    targets.forEach(target => {
+      if (target._hook) {
+        if (target._hook instanceof InputCompute) {
+          target._hook.off(EHookEvents.afterCalling, callback)
+        } else {
+          target._hook.off(EHookEvents.change, callback)
+        }
+      }
+    })
+  }
 }
 
 export function before(callback: () => void, targets: { _hook?: Hook }[]) {
@@ -2129,6 +2133,15 @@ export function before(callback: () => void, targets: { _hook?: Hook }[]) {
       }
     }
   })
+  return () => {
+    targets.forEach(target => {
+      if (target._hook) {
+        if (target._hook instanceof InputCompute) {
+          target._hook.off(EHookEvents.beforeCalling, callback)
+        }
+      }
+    })
+  }
 }
 
 export function combineLatest<T>(
