@@ -2066,6 +2066,7 @@ export function cache<T>(key: string, options: ICacheOptions<T>) {
 // alias
 export type ComputedSignal<T> = ComputedGetter<T>
 export type StateSignal<T> = StateGetterAndSetter<T>
+export type Signal<T> = StateGetterAndSetter<T>
 
 export function signal<T>(fn: FComputedFuncGenerator<T>): ComputedSignal<T>
 export function signal<T>(fn: FComputedFuncAsync<T>): ComputedSignal<T>
