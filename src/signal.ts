@@ -121,7 +121,7 @@ export function isState(h: { _hook?: State }) {
   return h && (h._hook ? h._hook instanceof State : h instanceof State)
 }
 
-export function isSignal(h: { _hook?: State | Computed<any> }) {
+export function isSignal(h: { _hook?: State | Computed<any> }): h is Signal<any> {
   return h?._hook && (h._hook instanceof Computed || h._hook instanceof State)
 }
 
